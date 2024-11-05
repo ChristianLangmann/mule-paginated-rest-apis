@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_7a5d3a96_573c_471a_abca_b8cf73c472fe_Input_Variables_nextPage = Any
+

@@ -1,0 +1,43 @@
+#%RAML 1.0
+title: Paged documents - known size
+version: v1
+protocols:
+  - HTTP
+baseUri: http://localhost:8080/api/
+
+/documents:
+  get:
+    queryParameters:
+      page-size: 
+        type: integer
+        default: 2
+      page: 
+        type: string
+        default: "0"
+    responses:
+      200:
+        body:
+          application/json:
+            type: object
+            properties:
+              data: 
+                type: object
+                properties:
+                  documents: 
+                    type: object[]
+                    items:
+                      type: object
+                      properties:
+                        element: integer
+              nextPage?: string
+            examples:
+              0: 
+                data: 
+                  documents:
+                  - element: 0
+                  - element: 1
+                nextPage: "1"
+              1:
+                data: 
+                  documents:
+                  - element: 3

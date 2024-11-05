@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java"
+      xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+                          http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+                          http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+
+	<flow name="retrieveAllDocuments-wrong">
+        <http:listener config-ref="HTTP_Listener_config" path="/documents-does-not-work" doc:name="/documents-does-not-work-us"/>
+
+        <!-- Initialize variables -->
+        <set-variable variableName="page" value="0" doc:name='nextPage = "0"'/>
+        <set-variable variableName="allDocuments" value="#[[]]" doc:name="allDocuments = []"/>
+
+        <!-- Fetch documents until there are no more pages -->
+        <until-successful doc:name="Fetch Until No More Pages" millisBetweenRetries="0" maxRetries="1000">
+            <!-- HTTP Request to fetch the current page -->
+			<http:request config-ref="HTTP_Request_Configuration" path="documents" method="GET" doc:name="/documents&amp;page={vars.nextPage}">
+				<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"page-size" : 2,
+	"page" : vars.nextPage
+}]]]></http:query-params>
+            </http:request>
+
+            <!-- Transform JSON response to Java object -->
+
+            <!-- DataWeave transformation to extract and accumulate documents -->
+
+            <!-- Update variables -->
+            <set-variable variableName="allDocuments" value="#[vars.allDocuments ++ payload.data.documents]" doc:name="allDocuments ++ payload.data.documents"/>
+            <set-variable variableName="page" value="#[payload.nextPage]" doc:name="nextPage = payload.nextPage"/>
+			<validation:is-null doc:name="exit when nextPage is null" doc:id="75cab060-b702-42a2-ae8d-32699326dbfc" value="#[vars.nextPage]"/>
+        </until-successful>
+
+        <!-- Set final payload with all collected documents -->
+        <set-payload value="#[%dw 2.0&#10;output application/json&#10;---&#10;vars.allDocuments]" doc:name="Set payload to allDocuments"/>
+    </flow>
+</mule>

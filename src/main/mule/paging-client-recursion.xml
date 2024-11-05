@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+	  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"      
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"      
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <flow name="retrieveAllDocuments-recursive">
+        <http:listener config-ref="HTTP_Listener_config" path="/documents-recursive" doc:name="/documents-recursive"/>
+        <set-variable variableName="allDocuments" value="#[[]]" doc:name="Set allDocuments  = []"/>
+        <set-variable variableName="nextPage" value='0' doc:name='Set nextPage = "0"'/>
+        <flow-ref name="fetchNextPageFlow" doc:name="Fetch Next Page"/>
+        <ee:transform doc:name="allDocuments as Json">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.allDocuments]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <sub-flow name="fetchNextPageFlow" doc:id="7a5d3a96-573c-471a-abca-b8cf73c472fe">
+        <http:request method="GET" doc:name="/documents?page={vars.nextPage}" config-ref="HTTP_Request_Configuration" path="documents">
+            <http:query-params><![CDATA[#[output application/java
+---
+{
+	"page-size" : 2,
+	"page" : vars.nextPage
+}]]]></http:query-params>
+        </http:request>
+        <set-variable variableName="allDocuments" value="#[output application/java&#10;---&#10;vars.allDocuments ++ payload.data.documents]" doc:name="allDocuments ++ payload.data.documents"/>
+        <set-variable variableName="nextPage" value="#[payload.nextPage]" doc:name="nextPage = payload.nextPage"/>
+        <choice>
+            <when expression="#[vars.nextPage != null]">
+                <flow-ref name="fetchNextPageFlow" doc:name="Fetch Next Page" doc:id="f755e59d-d9f3-445d-b217-9e035503551f"/>
+            </when>
+        </choice>
+    </sub-flow>
+</mule>

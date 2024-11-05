@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:loop="http://www.mulesoft.org/schema/mule/loop"
+      xmlns:untilsuccessfulfailfast="http://www.mulesoft.org/schema/mule/untilsuccessfulfailfast"
+      xmlns:java="http://www.mulesoft.org/schema/mule/java"
+      xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+                          http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+                          http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd
+http://www.mulesoft.org/schema/mule/untilsuccessfulfailfast http://www.mulesoft.org/schema/mule/untilsuccessfulfailfast/current/mule-untilsuccessfulfailfast.xsd
+http://www.mulesoft.org/schema/mule/loop http://www.mulesoft.org/schema/mule/loop/current/mule-loop.xsd">
+
+	<flow name="retrieveAllDocuments-us">
+        <http:listener config-ref="HTTP_Listener_config" path="/documents-us" doc:name="/documents-us" />
+
+        <!-- Initialize variables -->
+
+        <!-- Fetch documents until there are no more pages -->
+
+        <!-- Set final payload with all collected documents -->
+		<flow-ref doc:name="colect-pages" doc:id="4be041e0-8ebc-46ba-957f-2fbb282e98e9" name="collect-pages" />
+		<set-payload value="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" doc:name="return json" />
+    </flow>
+	<sub-flow name="collect-pages" doc:id="577aeb54-a24d-4cb8-9368-f9ab3f472fe4" >
+		<java:new doc:name='pageCollectors = PageCollector("0")' doc:id="d2ca2e41-fd26-4475-9816-2fcaf1317e66" class="de.codecentric.mule.PageCollector" target="pageCollector" constructor="PageCollector(java.lang.String)">
+			<java:args><![CDATA[#[{
+	firstPageToken: "0"
+}]]]></java:args>
+		</java:new>
+		<until-successful doc:name="Fetch Until No More Pages" maxRetries="1000" millisBetweenRetries="0">
+            <!-- HTTP Request to fetch the current page -->
+            <java:invoke doc:name="pageCollector.getContinuationToken()" doc:id="dee2b289-9d7e-4707-9602-526fb411df9a" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" method="getContinuationToken()" />
+			<http:request config-ref="HTTP_Request_Configuration" path="documents" method="GET" doc:name="/documents?page=payload">
+				<http:query-params><![CDATA[#[output application/java
+---
+{
+	"page-size" : 2,
+	"page" : payload
+}]]]></http:query-params>
+            </http:request>
+
+            <!-- Transform JSON response to Java object -->
+
+            <!-- DataWeave transformation to extract and accumulate documents -->
+
+            <!-- Update variables -->
+            <java:invoke method="addElements(java.lang.Object[])" doc:name="pageCollector.addElements" doc:id="0da39f81-2893-4a8a-89db-bd0610811eb6" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" target="dummy">
+				<java:args><![CDATA[#[{ 
+	pageElements: payload.data.documents
+}]]]></java:args>
+			</java:invoke>
+			<java:invoke doc:name="pageCollector.setContinuationToken(payload.nextPage)" doc:id="7ff84a9f-aecf-4163-9326-6820ccf65445" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" method="setContinuationToken(java.lang.String)" target="dummy">
+				<java:args><![CDATA[#[{
+	token: payload.nextPage
+}]]]></java:args>
+			</java:invoke>
+			<validation:is-null doc:name="raise APP:MORE_DATA when nextPage is not null" doc:id="56d86028-8d87-459f-867a-7c64031f3e25" value="#[payload.nextPage]">
+				<error-mapping sourceType="VALIDATION:NOT_NULL" targetType="APP:MORE_DATA" />
+			</validation:is-null>
+        </until-successful>
+		<java:invoke doc:name="pageCollector.getCollectedElements()" doc:id="1ff6294d-1946-46be-b02a-5b8053edecbf" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" method="getCollectedElements()" />
+	</sub-flow>
+</mule>

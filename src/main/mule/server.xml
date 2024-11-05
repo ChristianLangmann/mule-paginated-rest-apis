@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+    <http:listener-config name="HTTP_ServerListener_config" doc:name="HTTP_ServerListener_config" doc:id="929b9f74-457e-4bf5-a29e-008623298b27" basePath="/">
+        <http:listener-connection host="0.0.0.0" port="8080" />
+    </http:listener-config>
+    <apikit:config name="Router" api="documents-unknown-size.raml" outboundHeadersMapName="outboundHeadersMapName" httpStatusVarName="httpStatus" />
+	<flow name="serverFlow" doc:id="30650158-14d0-4020-ba29-0af6eef44bae" >
+		<http:listener doc:name="Listener" doc:id="fbd7564a-6e6c-441e-8d6a-280464e4af29" config-ref="HTTP_ServerListener_config" path="/api/*"/>
+		<validation:is-number numberType="INTEGER" doc:name="Is number" doc:id="debed7f7-4236-43b5-b50c-0d0b9d737aa5" value="#[attributes.queryParams.page]" minValue="0" maxValue="3" message='#["Invalid requested page: " ++ (attributes.queryParams.page default "null")]'/>
+		<set-variable value="#[attributes.queryParams.page as Number]" doc:name="requestPage = attributes.queryParams.page" doc:id="bfb9f6de-990e-4c1b-b7dc-150f0db98eb9" variableName="requestedPage"/>
+		<apikit:router doc:name="APIkit Router" doc:id="6e326ffd-004c-43a1-97cc-9556c4148b70" config-ref="Router"/>
+	</flow>
+	<flow name="get:\documents:Router">
+		<ee:transform doc:name="return data" doc:id="6ac0f475-3085-465e-a712-3c074aea5530">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data: {
+		documents: if (vars.requestedPage < 3) [{
+			element: vars.requestedPage * 2
+		}, {
+			element: vars.requestedPage * 2 + 1
+		}] else if (vars.requestedPage == 3) [{
+			element: vars.requestedPage * 2
+		}] else []
+	},
+	(nextPage: (vars.requestedPage + 1) as String) if (vars.requestedPage < 3) 
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+</mule>

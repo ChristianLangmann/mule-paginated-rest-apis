@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:loop="http://www.mulesoft.org/schema/mule/loop"
+      xmlns:java="http://www.mulesoft.org/schema/mule/java"
+      xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+                          http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+                          http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd
+http://www.mulesoft.org/schema/mule/loop http://www.mulesoft.org/schema/mule/loop/current/mule-loop.xsd">
+
+	<flow name="retrieveAllDocuments-loop">
+        <http:listener config-ref="HTTP_Listener_config" path="/documents-loop" doc:name="/documents-loop" />
+
+        <!-- Initialize variables -->
+
+        <!-- Fetch documents until there are no more pages -->
+
+        <!-- Set final payload with all collected documents -->
+		<flow-ref doc:name="collect-pages-while" doc:id="400cb2ad-ae55-43a9-bbd2-ed823606a440" name="collect-pages-while" />
+		<set-payload value="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" doc:name="return json" />
+    </flow>
+	<sub-flow name="collect-pages-while" doc:id="bd0874d9-8bc1-4457-a067-036ab4108c08" >
+		<java:new doc:name='pageCollectors = PageCollector("0")' doc:id="d2ca2e41-fd26-4475-9816-2fcaf1317e66" class="de.codecentric.mule.PageCollector" target="pageCollector" constructor="PageCollector(java.lang.String)">
+			<java:args><![CDATA[#[{
+	firstPageToken: "0"
+}]]]></java:args>
+		</java:new>
+		<loop:repeat-until-payload-not-empty doc:name="Repeat until payload not empty" doc:id="3cf6bde1-eb27-4b44-80a9-f4c601bb332d">
+			<java:invoke doc:name="pageCollector.getContinuationToken()" doc:id="dee2b289-9d7e-4707-9602-526fb411df9a" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" method="getContinuationToken()" />
+			<http:request config-ref="HTTP_Request_Configuration" path="documents" method="GET" doc:name="/documents?page=payload">
+				<http:query-params><![CDATA[#[output application/java
+---
+{
+	"page-size" : 2,
+	"page" : payload
+}]]]></http:query-params>
+            </http:request>
+			<java:invoke method="addElements(java.lang.Object[])" doc:name="pageCollector.addElements(payload.data)" doc:id="0da39f81-2893-4a8a-89db-bd0610811eb6" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" target="dummy">
+				<java:args><![CDATA[#[{ 
+	pageElements: payload.data.documents
+}]]]></java:args>
+			</java:invoke>
+			<java:invoke doc:name="pageCollector.setContinuationToken(payload.nextPage)" doc:id="7ff84a9f-aecf-4163-9326-6820ccf65445" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" method="setContinuationToken(java.lang.String)" target="dummy">
+				<java:args><![CDATA[#[{
+	token: payload.nextPage
+}]]]></java:args>
+			</java:invoke>
+			<set-payload value='#[%dw 2.0&#10;output application/java&#10;---&#10;if (payload.nextPage != null) null else "stop"]' doc:name="nextPage" doc:id="86e82d42-36ad-4a12-b57d-73970823aa32" />
+		</loop:repeat-until-payload-not-empty>
+		<java:invoke doc:name="pageCollector.getCollectedElements()" doc:id="1ff6294d-1946-46be-b02a-5b8053edecbf" instance="#[vars.pageCollector]" class="de.codecentric.mule.PageCollector" method="getCollectedElements()" />
+	</sub-flow>
+</mule>
